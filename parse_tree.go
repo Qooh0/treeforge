@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"errors"
 	"path/filepath"
 	"strings"
 )
@@ -20,11 +20,18 @@ type Entry struct {
 
 func ParseTree(lines []string) ([]Entry, error) {
 	if len(lines) == 0 {
-		return nil, fmt.Errorf("empty input")
+		return nil, errors.New("empty tree")
+	}
+
+	// Check root line validity
+	root := strings.TrimSpace(lines[0])
+	root = strings.TrimSuffix(root, "/")
+	if root == "" {
+		return nil, errors.New("invalid root line")
 	}
 
 	// Skip root line (line 0)
-	var entries []Entry
+	var entries []Entry = make([]Entry, 0) // Initialize as empty slice, not nil
 	levelParent := map[int]string{0: ""}
 
 	for i := 1; i < len(lines); i++ {
@@ -79,8 +86,8 @@ func ParseTree(lines []string) ([]Entry, error) {
 }
 
 func cutComment(s string) string {
-	// Priority: " # " (space + hash + space)
-	if idx := strings.Index(s, " # "); idx >= 0 {
+	// Priority: " #" (space + hash)
+	if idx := strings.Index(s, " #"); idx >= 0 {
 		return s[:idx]
 	}
 
@@ -88,6 +95,9 @@ func cutComment(s string) string {
 	runes := []rune(s)
 	for i := 0; i < len(runes); i++ {
 		if runes[i] == '#' {
+			if i == 0 {
+				return ""
+			}
 			if i > 0 {
 				prev := runes[i-1]
 				if prev == ' ' || prev == '\t' || prev == '│' || prev == '|' {
@@ -168,7 +178,12 @@ func consumeIndent(s string) (level int, rest string) {
 func trimBranch(s string) string {
 	runes := []rune(s)
 
-	// Remove branch prefixes
+	// First, trim any leading spaces or tabs
+	for len(runes) > 0 && (runes[0] == ' ' || runes[0] == '\t') {
+		runes = runes[1:]
+	}
+
+	// Remove branch prefixes repeatedly
 	branches := []string{"├─", "└─", "|--", "`--", "+--"}
 	for {
 		trimmed := false
@@ -185,6 +200,10 @@ func trimBranch(s string) string {
 				if match {
 					runes = runes[len(branchRunes):]
 					trimmed = true
+					// After removing a branch token, trim spaces/tabs again
+					for len(runes) > 0 && (runes[0] == ' ' || runes[0] == '\t') {
+						runes = runes[1:]
+					}
 					break
 				}
 			}
@@ -194,17 +213,17 @@ func trimBranch(s string) string {
 		}
 	}
 
-	// Remove residual box drawing and dashes
+	// Remove residual box drawing characters, dashes, pipes, and spaces between them
 	for len(runes) > 0 {
 		r := runes[0]
-		if r == '─' || r == '—' || r == '│' || r == '|' || r == '-' {
+		if r == '─' || r == '—' || r == '│' || r == '|' || r == '-' || r == ' ' || r == '\t' {
 			runes = runes[1:]
 		} else {
 			break
 		}
 	}
 
-	// Trim left spaces
+	// Final trim of any remaining leading spaces
 	result := string(runes)
-	return strings.TrimLeft(result, " ")
+	return strings.TrimLeft(result, " \t")
 }
