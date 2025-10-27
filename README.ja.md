@@ -1,5 +1,11 @@
 # treeforge
 
+[![Test](https://github.com/Qooh0/treeforge/actions/workflows/test.yml/badge.svg)](https://github.com/Qooh0/treeforge/actions/workflows/test.yml)
+[![Release](https://github.com/Qooh0/treeforge/actions/workflows/release.yml/badge.svg)](https://github.com/Qooh0/treeforge/actions/workflows/release.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Qooh0/treeforge)](https://goreportcard.com/report/github.com/Qooh0/treeforge)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Latest Release](https://img.shields.io/github/v/release/Qooh0/treeforge)](https://github.com/Qooh0/treeforge/releases/latest)
+
 **treeforge** は、フォルダツリーを実際のディレクトリとファイルに変換する、  
 シンプルで安全なGoのCLIツールです。
 
