@@ -482,6 +482,156 @@ func TestConsumeIndent(t *testing.T) {
 	}
 }
 
+// Test helper functions for consumeIndent
+func TestMatchUnicodeBoxPattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		runes    []rune
+		pos      int
+		expected bool
+	}{
+		{
+			name:     "matches unicode box pattern",
+			runes:    []rune("│  file.txt"),
+			pos:      0,
+			expected: true,
+		},
+		{
+			name:     "no match - insufficient length",
+			runes:    []rune("│ "),
+			pos:      0,
+			expected: false,
+		},
+		{
+			name:     "no match - wrong pattern",
+			runes:    []rune("│x file.txt"),
+			pos:      0,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := matchUnicodeBoxPattern(tt.runes, tt.pos)
+			if result != tt.expected {
+				t.Errorf("matchUnicodeBoxPattern() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestMatchPipePattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		runes    []rune
+		pos      int
+		expected bool
+	}{
+		{
+			name:     "matches pipe pattern",
+			runes:    []rune("|  file.txt"),
+			pos:      0,
+			expected: true,
+		},
+		{
+			name:     "no match - insufficient length",
+			runes:    []rune("| "),
+			pos:      0,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := matchPipePattern(tt.runes, tt.pos)
+			if result != tt.expected {
+				t.Errorf("matchPipePattern() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestMatchThreeSpacePattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		runes    []rune
+		pos      int
+		expected bool
+	}{
+		{
+			name:     "matches three space pattern",
+			runes:    []rune("   file.txt"),
+			pos:      0,
+			expected: true,
+		},
+		{
+			name:     "no match - insufficient length",
+			runes:    []rune("  "),
+			pos:      0,
+			expected: false,
+		},
+		{
+			name:     "no match - mixed characters",
+			runes:    []rune("  x"),
+			pos:      0,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := matchThreeSpacePattern(tt.runes, tt.pos)
+			if result != tt.expected {
+				t.Errorf("matchThreeSpacePattern() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestConsumeSinglePipeWithSpaces(t *testing.T) {
+	tests := []struct {
+		name         string
+		runes        []rune
+		pos          int
+		expectedPos  int
+		expectedFound bool
+	}{
+		{
+			name:         "pipe with spaces",
+			runes:        []rune("|   file.txt"),
+			pos:          0,
+			expectedPos:  4,
+			expectedFound: true,
+		},
+		{
+			name:         "unicode pipe with spaces",
+			runes:        []rune("│   file.txt"),
+			pos:          0,
+			expectedPos:  4,
+			expectedFound: true,
+		},
+		{
+			name:         "pipe without spaces",
+			runes:        []rune("|file.txt"),
+			pos:          0,
+			expectedPos:  0,
+			expectedFound: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			newPos, found := consumeSinglePipeWithSpaces(tt.runes, tt.pos)
+			if newPos != tt.expectedPos {
+				t.Errorf("consumeSinglePipeWithSpaces() pos = %d, want %d", newPos, tt.expectedPos)
+			}
+			if found != tt.expectedFound {
+				t.Errorf("consumeSinglePipeWithSpaces() found = %v, want %v", found, tt.expectedFound)
+			}
+		})
+	}
+}
+
 func TestTrimBranch(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -555,6 +705,116 @@ func TestTrimBranch(t *testing.T) {
 			result := trimBranch(tt.input)
 			if result != tt.expected {
 				t.Errorf("trimBranch(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+// Test helper functions for trimBranch
+func TestTrimLeadingWhitespace(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []rune
+		expected []rune
+	}{
+		{
+			name:     "no leading whitespace",
+			input:    []rune("file.txt"),
+			expected: []rune("file.txt"),
+		},
+		{
+			name:     "spaces and tabs",
+			input:    []rune("  \tfile.txt"),
+			expected: []rune("file.txt"),
+		},
+		{
+			name:     "only whitespace",
+			input:    []rune("   "),
+			expected: []rune(""),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := trimLeadingWhitespace(tt.input)
+			if string(result) != string(tt.expected) {
+				t.Errorf("trimLeadingWhitespace(%q) = %q, want %q", string(tt.input), string(result), string(tt.expected))
+			}
+		})
+	}
+}
+
+func TestRemoveBranchPrefixes(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []rune
+		expected []rune
+	}{
+		{
+			name:     "unicode branch",
+			input:    []rune("├─ file.txt"),
+			expected: []rune("file.txt"),
+		},
+		{
+			name:     "ASCII branch",
+			input:    []rune("|-- file.txt"),
+			expected: []rune("file.txt"),
+		},
+		{
+			name:     "multiple branches",
+			input:    []rune("├─└─ file.txt"),
+			expected: []rune("file.txt"),
+		},
+		{
+			name:     "no branch",
+			input:    []rune("file.txt"),
+			expected: []rune("file.txt"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := removeBranchPrefixes(tt.input)
+			if string(result) != string(tt.expected) {
+				t.Errorf("removeBranchPrefixes(%q) = %q, want %q", string(tt.input), string(result), string(tt.expected))
+			}
+		})
+	}
+}
+
+func TestRemoveResidualBoxDrawing(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []rune
+		expected []rune
+	}{
+		{
+			name:     "box drawing characters",
+			input:    []rune("─│| file.txt"),
+			expected: []rune("file.txt"),
+		},
+		{
+			name:     "mixed characters with spaces",
+			input:    []rune("─ │ | file.txt"),
+			expected: []rune("file.txt"),
+		},
+		{
+			name:     "no box drawing",
+			input:    []rune("file.txt"),
+			expected: []rune("file.txt"),
+		},
+		{
+			name:     "preserve dots",
+			input:    []rune(".gitignore"),
+			expected: []rune(".gitignore"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := removeResidualBoxDrawing(tt.input)
+			if string(result) != string(tt.expected) {
+				t.Errorf("removeResidualBoxDrawing(%q) = %q, want %q", string(tt.input), string(result), string(tt.expected))
 			}
 		})
 	}

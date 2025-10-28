@@ -110,27 +110,63 @@ func cutComment(s string) string {
 	return s
 }
 
+// Helper functions for consumeIndent
+func matchUnicodeBoxPattern(runes []rune, pos int) bool {
+	return pos+2 < len(runes) && runes[pos] == '│' && runes[pos+1] == ' ' && runes[pos+2] == ' '
+}
+
+func matchPipePattern(runes []rune, pos int) bool {
+	return pos+2 < len(runes) && runes[pos] == '|' && runes[pos+1] == ' ' && runes[pos+2] == ' '
+}
+
+func matchThreeSpacePattern(runes []rune, pos int) bool {
+	return pos+2 < len(runes) && runes[pos] == ' ' && runes[pos+1] == ' ' && runes[pos+2] == ' '
+}
+
+func consumeSinglePipeWithSpaces(runes []rune, pos int) (int, bool) {
+	if pos >= len(runes) {
+		return pos, false
+	}
+	
+	if runes[pos] == '│' || runes[pos] == '|' {
+		start := pos
+		pos++
+		// Consume trailing spaces
+		for pos < len(runes) && runes[pos] == ' ' {
+			pos++
+		}
+		if pos > start+1 {
+			// Had spaces after │ or |, count as one level
+			return pos, true
+		}
+		// No spaces, revert
+		return start, false
+	}
+	
+	return pos, false
+}
+
 func consumeIndent(s string) (level int, rest string) {
 	runes := []rune(s)
 	pos := 0
 
 	for pos < len(runes) {
 		// Try '│  ' (U+2502 + 2 spaces)
-		if pos+2 < len(runes) && runes[pos] == '│' && runes[pos+1] == ' ' && runes[pos+2] == ' ' {
+		if matchUnicodeBoxPattern(runes, pos) {
 			level++
 			pos += 3
 			continue
 		}
 
 		// Try '|  ' (pipe + 2 spaces)
-		if pos+2 < len(runes) && runes[pos] == '|' && runes[pos+1] == ' ' && runes[pos+2] == ' ' {
+		if matchPipePattern(runes, pos) {
 			level++
 			pos += 3
 			continue
 		}
 
 		// Try '   ' (3 spaces)
-		if pos+2 < len(runes) && runes[pos] == ' ' && runes[pos+1] == ' ' && runes[pos+2] == ' ' {
+		if matchThreeSpacePattern(runes, pos) {
 			level++
 			pos += 3
 			continue
@@ -144,21 +180,10 @@ func consumeIndent(s string) (level int, rest string) {
 		}
 
 		// Try single '│' or '|' followed by spaces
-		if runes[pos] == '│' || runes[pos] == '|' {
-			start := pos
-			pos++
-			// Consume trailing spaces
-			for pos < len(runes) && runes[pos] == ' ' {
-				pos++
-			}
-			if pos > start+1 {
-				// Had spaces after │ or |, count as one level
-				level++
-				continue
-			}
-			// No spaces, revert
-			pos = start
-			break
+		if newPos, found := consumeSinglePipeWithSpaces(runes, pos); found {
+			level++
+			pos = newPos
+			continue
 		}
 
 		// Check if it's a leading space that doesn't form a pattern
@@ -175,15 +200,15 @@ func consumeIndent(s string) (level int, rest string) {
 	return level, string(runes[pos:])
 }
 
-func trimBranch(s string) string {
-	runes := []rune(s)
-
-	// First, trim any leading spaces or tabs
+// Helper functions for trimBranch
+func trimLeadingWhitespace(runes []rune) []rune {
 	for len(runes) > 0 && (runes[0] == ' ' || runes[0] == '\t') {
 		runes = runes[1:]
 	}
+	return runes
+}
 
-	// Remove branch prefixes repeatedly
+func removeBranchPrefixes(runes []rune) []rune {
 	branches := []string{"├─", "└─", "|--", "`--", "+--"}
 	for {
 		trimmed := false
@@ -201,9 +226,7 @@ func trimBranch(s string) string {
 					runes = runes[len(branchRunes):]
 					trimmed = true
 					// After removing a branch token, trim spaces/tabs again
-					for len(runes) > 0 && (runes[0] == ' ' || runes[0] == '\t') {
-						runes = runes[1:]
-					}
+					runes = trimLeadingWhitespace(runes)
 					break
 				}
 			}
@@ -212,8 +235,10 @@ func trimBranch(s string) string {
 			break
 		}
 	}
+	return runes
+}
 
-	// Remove residual box drawing characters, dashes, pipes, and spaces between them
+func removeResidualBoxDrawing(runes []rune) []rune {
 	for len(runes) > 0 {
 		r := runes[0]
 		if r == '─' || r == '—' || r == '│' || r == '|' || r == '-' || r == ' ' || r == '\t' {
@@ -222,6 +247,20 @@ func trimBranch(s string) string {
 			break
 		}
 	}
+	return runes
+}
+
+func trimBranch(s string) string {
+	runes := []rune(s)
+
+	// First, trim any leading spaces or tabs
+	runes = trimLeadingWhitespace(runes)
+
+	// Remove branch prefixes repeatedly
+	runes = removeBranchPrefixes(runes)
+
+	// Remove residual box drawing characters, dashes, pipes, and spaces between them
+	runes = removeResidualBoxDrawing(runes)
 
 	// Final trim of any remaining leading spaces
 	result := string(runes)

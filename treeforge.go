@@ -13,6 +13,107 @@ var (
 	version = "1.0.0"
 )
 
+// Helper functions for main
+func processInput(inputFile string, verbose bool) ([]string, error) {
+	if inputFile != "" {
+		return readFromFile(inputFile, verbose)
+	}
+	return readFromStdin(verbose)
+}
+
+func determineRootName(rootName, firstLine string) string {
+	if rootName != "" {
+		return rootName
+	}
+	
+	root := strings.TrimSpace(firstLine)
+	root = strings.TrimSuffix(root, "/")
+	if root == "" {
+		return "output"
+	}
+	return root
+}
+
+func printDryRun(basePath string, entries []Entry) {
+	fmt.Println("=== Dry-run mode (use --apply to create files) ===")
+	fmt.Printf("Base: %s\n\n", basePath)
+	for _, entry := range entries {
+		fullPath := filepath.Join(basePath, entry.Path)
+		if entry.Kind == KindDir {
+			fmt.Printf("  [DIR]  %s\n", fullPath)
+		} else {
+			fmt.Printf("  [FILE] %s\n", fullPath)
+		}
+	}
+	fmt.Printf("\nTotal: %d directories, %d files\n", countDirs(entries), countFiles(entries))
+}
+
+func createEntry(entry Entry, basePath string, force, verbose bool) (string, error) {
+	fullPath := filepath.Join(basePath, entry.Path)
+
+	if entry.Kind == KindDir {
+		if err := os.MkdirAll(fullPath, 0755); err != nil {
+			return "", fmt.Errorf("creating directory %s: %w", fullPath, err)
+		}
+		if verbose {
+			fmt.Printf("  [DIR]  %s\n", fullPath)
+		}
+		return "created", nil
+	} else {
+		// Check if file exists
+		if _, err := os.Stat(fullPath); err == nil && !force {
+			if verbose {
+				fmt.Printf("  [SKIP] %s (already exists)\n", fullPath)
+			}
+			return "skipped", nil
+		}
+
+		// Create parent directory if needed
+		dir := filepath.Dir(fullPath)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return "", fmt.Errorf("creating directory for file %s: %w", fullPath, err)
+		}
+
+		// Create empty file
+		file, err := os.Create(fullPath)
+		if err != nil {
+			return "", fmt.Errorf("creating file %s: %w", fullPath, err)
+		}
+		file.Close()
+
+		if verbose {
+			fmt.Printf("  [FILE] %s\n", fullPath)
+		}
+		return "created", nil
+	}
+}
+
+func applyEntries(basePath string, entries []Entry, force, verbose bool) error {
+	// Create base directory
+	if err := os.MkdirAll(basePath, 0755); err != nil {
+		return fmt.Errorf("creating base directory: %w", err)
+	}
+
+	created := 0
+	skipped := 0
+
+	for _, entry := range entries {
+		result, err := createEntry(entry, basePath, force, verbose)
+		if err != nil {
+			return err
+		}
+		
+		if result == "created" {
+			created++
+		} else if result == "skipped" {
+			skipped++
+		}
+	}
+
+	fmt.Printf("\n✓ Done! Created: %d, Skipped: %d\n", created, skipped)
+	return nil
+}
+
 func main() {
 	var (
 		inputFile = flag.String("i", "", "Input tree structure file (default: stdin)")
@@ -31,15 +132,7 @@ func main() {
 	}
 
 	// Read input
-	var lines []string
-	var err error
-
-	if *inputFile != "" {
-		lines, err = readFromFile(*inputFile, *verbose)
-	} else {
-		lines, err = readFromStdin(*verbose)
-	}
-
+	lines, err := processInput(*inputFile, *verbose)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error reading input: %v\n", err)
 		os.Exit(1)
@@ -65,32 +158,13 @@ func main() {
 		fmt.Printf("Parsed %d entries\n", len(entries))
 	}
 
-	// Determine root name
-	root := *rootName
-	if root == "" {
-		root = strings.TrimSpace(lines[0])
-		root = strings.TrimSuffix(root, "/")
-		if root == "" {
-			root = "output"
-		}
-	}
-
-	// Create base path
+	// Determine root name and create base path
+	root := determineRootName(*rootName, lines[0])
 	basePath := filepath.Join(*parent, root)
 
 	// Dry-run or apply
 	if !*apply {
-		fmt.Println("=== Dry-run mode (use --apply to create files) ===")
-		fmt.Printf("Base: %s\n\n", basePath)
-		for _, entry := range entries {
-			fullPath := filepath.Join(basePath, entry.Path)
-			if entry.Kind == KindDir {
-				fmt.Printf("  [DIR]  %s\n", fullPath)
-			} else {
-				fmt.Printf("  [FILE] %s\n", fullPath)
-			}
-		}
-		fmt.Printf("\nTotal: %d directories, %d files\n", countDirs(entries), countFiles(entries))
+		printDryRun(basePath, entries)
 		return
 	}
 
@@ -99,60 +173,10 @@ func main() {
 		fmt.Printf("Creating structure in: %s\n", basePath)
 	}
 
-	// Create base directory
-	if err := os.MkdirAll(basePath, 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating base directory: %v\n", err)
+	if err := applyEntries(basePath, entries, *force, *verbose); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-
-	created := 0
-	skipped := 0
-
-	for _, entry := range entries {
-		fullPath := filepath.Join(basePath, entry.Path)
-
-		if entry.Kind == KindDir {
-			if err := os.MkdirAll(fullPath, 0755); err != nil {
-				fmt.Fprintf(os.Stderr, "Error creating directory %s: %v\n", fullPath, err)
-				os.Exit(1)
-			}
-			if *verbose {
-				fmt.Printf("  [DIR]  %s\n", fullPath)
-			}
-			created++
-		} else {
-			// Check if file exists
-			if _, err := os.Stat(fullPath); err == nil && !*force {
-				if *verbose {
-					fmt.Printf("  [SKIP] %s (already exists)\n", fullPath)
-				}
-				skipped++
-				continue
-			}
-
-			// Create parent directory if needed
-			dir := filepath.Dir(fullPath)
-			if err := os.MkdirAll(dir, 0755); err != nil {
-				fmt.Fprintf(os.Stderr, "Error creating directory for file %s: %v\n", fullPath, err)
-				os.Exit(1)
-			}
-
-			// Create empty file
-			file, err := os.Create(fullPath)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error creating file %s: %v\n", fullPath, err)
-				os.Exit(1)
-			}
-			file.Close()
-
-			if *verbose {
-				fmt.Printf("  [FILE] %s\n", fullPath)
-			}
-			created++
-		}
-	}
-
-	fmt.Printf("\n✓ Done! Created: %d, Skipped: %d\n", created, skipped)
 }
 
 func readFromFile(path string, verbose bool) ([]string, error) {
