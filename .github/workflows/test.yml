@@ -42,6 +42,18 @@ jobs:
       - name: Test
         run: go test -v ./...
 
+      - name: Install gocyclo
+        run: go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
+
+      - name: Check cyclomatic complexity
+        run: |
+          if [ "$(gocyclo -over 15 . | wc -l)" -gt 0 ]; then
+            echo "High cyclomatic complexity detected:"
+            gocyclo -over 15 .
+            echo "Please refactor functions with complexity > 15."
+            exit 1
+          fi
+
       - name: Test Coverage
         run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
 

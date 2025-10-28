@@ -151,6 +151,8 @@ lets you instantly materialize your project layout, sample code, or teaching exa
 ---
 
 ## 🛠️ Development
+
+### Quick Start
 ```bash
 # Clone and build
 git clone https://github.com/qooh0/treeforge.git
@@ -160,6 +162,80 @@ go build -o treeforge
 # Run locally
 ./treeforge -i sample.txt --apply
 ```
+
+### Development Workflow
+
+**🔧 Setup Development Tools:**
+```bash
+# Install development dependencies
+make install-tools
+```
+
+**✅ Code Quality Checks:**
+```bash
+# Format code automatically
+make format
+
+# Run all quality checks (format + vet + test + complexity)
+make check
+
+# Run pre-commit checks
+make pre-commit
+
+# Individual checks
+make vet          # Static analysis
+make test         # Run tests
+make complexity   # Check cyclomatic complexity
+```
+
+**🔄 Git Workflow:**
+```bash
+# Development workflow
+git add .
+git commit -m "your changes"  # Pre-commit hook automatically runs checks
+
+# Manual pre-commit verification
+make pre-commit
+```
+
+**🏗️ Build & Clean:**
+```bash
+make build   # Build binary
+make clean   # Clean artifacts and test cache
+```
+
+### Pre-commit Hooks
+
+The repository includes automatic pre-commit hooks that run:
+- **gofmt**: Code formatting with `-s` flag
+- **go vet**: Static analysis
+- **go test**: Full test suite
+- **gocyclo**: Cyclomatic complexity check (max 15)
+
+If any check fails, the commit is rejected. Format issues are automatically fixed.
+
+### Code Quality Standards
+
+- **Test Coverage**: Maintain 100% test coverage
+- **Complexity**: Keep cyclomatic complexity ≤ 15
+- **Formatting**: Use `gofmt -s` standard formatting
+- **Linting**: Pass `go vet` without warnings
+
+### Available Make Targets
+
+| Command | Description |
+|---------|-------------|
+| `make install-tools` | Install gocyclo and other dev tools |
+| `make format` | Auto-format code with gofmt |
+| `make vet` | Run go vet static analysis |
+| `make test` | Run test suite |
+| `make complexity` | Check cyclomatic complexity |
+| `make check` | Run all quality checks |
+| `make pre-commit` | Full pre-commit validation |
+| `make build` | Build the binary |
+| `make clean` | Clean build artifacts |
+
+> 📖 **For detailed development guide, see [DEVELOPMENT.md](DEVELOPMENT.md)**
 
 ---
 
