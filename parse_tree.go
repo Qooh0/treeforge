@@ -127,7 +127,7 @@ func consumeSinglePipeWithSpaces(runes []rune, pos int) (int, bool) {
 	if pos >= len(runes) {
 		return pos, false
 	}
-	
+
 	if runes[pos] == '│' || runes[pos] == '|' {
 		start := pos
 		pos++
@@ -142,7 +142,7 @@ func consumeSinglePipeWithSpaces(runes []rune, pos int) (int, bool) {
 		// No spaces, revert
 		return start, false
 	}
-	
+
 	return pos, false
 }
 

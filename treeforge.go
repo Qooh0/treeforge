@@ -25,7 +25,7 @@ func determineRootName(rootName, firstLine string) string {
 	if rootName != "" {
 		return rootName
 	}
-	
+
 	root := strings.TrimSpace(firstLine)
 	root = strings.TrimSuffix(root, "/")
 	if root == "" {
@@ -102,7 +102,7 @@ func applyEntries(basePath string, entries []Entry, force, verbose bool) error {
 		if err != nil {
 			return err
 		}
-		
+
 		if result == "created" {
 			created++
 		} else if result == "skipped" {

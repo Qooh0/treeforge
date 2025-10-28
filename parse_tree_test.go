@@ -590,31 +590,31 @@ func TestMatchThreeSpacePattern(t *testing.T) {
 
 func TestConsumeSinglePipeWithSpaces(t *testing.T) {
 	tests := []struct {
-		name         string
-		runes        []rune
-		pos          int
-		expectedPos  int
+		name          string
+		runes         []rune
+		pos           int
+		expectedPos   int
 		expectedFound bool
 	}{
 		{
-			name:         "pipe with spaces",
-			runes:        []rune("|   file.txt"),
-			pos:          0,
-			expectedPos:  4,
+			name:          "pipe with spaces",
+			runes:         []rune("|   file.txt"),
+			pos:           0,
+			expectedPos:   4,
 			expectedFound: true,
 		},
 		{
-			name:         "unicode pipe with spaces",
-			runes:        []rune("│   file.txt"),
-			pos:          0,
-			expectedPos:  4,
+			name:          "unicode pipe with spaces",
+			runes:         []rune("│   file.txt"),
+			pos:           0,
+			expectedPos:   4,
 			expectedFound: true,
 		},
 		{
-			name:         "pipe without spaces",
-			runes:        []rune("|file.txt"),
-			pos:          0,
-			expectedPos:  0,
+			name:          "pipe without spaces",
+			runes:         []rune("|file.txt"),
+			pos:           0,
+			expectedPos:   0,
 			expectedFound: false,
 		},
 	}
